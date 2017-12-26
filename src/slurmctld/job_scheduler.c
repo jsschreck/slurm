@@ -123,8 +123,10 @@ static void *	_run_prolog(void *arg);
 static bool	_scan_depend(List dependency_list, uint32_t job_id);
 static void *	_sched_agent(void *args);
 static int	_schedule(uint32_t job_limit);
+static int	_valid_batch_features(struct job_record *job_ptr,
+				      bool can_reboot);
 static int	_valid_feature_list(struct job_record *job_ptr,
-				    List feature_list);
+				    bool can_reboot);
 static int	_valid_node_feature(char *feature, bool can_reboot);
 #ifndef HAVE_FRONT_END
 static void *	_wait_boot(void *arg);
@@ -149,7 +151,7 @@ extern diag_stats_t slurmctld_diag_stats;
 /*
  * Calculate how busy the system is by figuring out how busy each node is.
  */
-static double _get_system_usage()
+static double _get_system_usage(void)
 {
 	static double sys_usage_per = 0.0;
 	static time_t last_idle_update = 0;
@@ -2712,6 +2714,10 @@ extern void launch_job(struct job_record *job_ptr)
 	if (!launch_job_ptr)
 		return;
 
+	if (!launch_job_ptr->batch_host &&
+	    (pick_batch_host(launch_job_ptr) != SLURM_SUCCESS))
+		return;
+
 	launch_msg_ptr = _build_launch_job_msg(launch_job_ptr,protocol_version);
 	if (launch_msg_ptr == NULL)
 		return;
@@ -4459,9 +4465,17 @@ extern int build_feature_list(struct job_record *job_ptr)
 {
 	struct job_details *detail_ptr = job_ptr->details;
 	char *tmp_requested, *str_ptr, *feature = NULL;
-	int bracket = 0, count = 0, i, paren = 0;
+	int bracket = 0, count = 0, i, paren = 0, rc;
 	bool fail = false;
 	job_feature_t *feat;
+	bool can_reboot;
+
+	can_reboot = node_features_g_user_update(job_ptr->user_id);
+	if (job_ptr->batch_features) {
+		rc = _valid_batch_features(job_ptr, can_reboot);
+		if (rc != SLURM_SUCCESS)
+			return rc;
+	}
 
 	if (!detail_ptr || !detail_ptr->features)	/* no constraints */
 		return SLURM_SUCCESS;
@@ -4582,7 +4596,7 @@ extern int build_feature_list(struct job_record *job_ptr)
 		return ESLURM_INVALID_FEATURE;
 	}
 
-	return _valid_feature_list(job_ptr, detail_ptr->feature_list);
+	return _valid_feature_list(job_ptr, can_reboot);
 }
 
 static void _feature_list_delete(void *x)
@@ -4594,21 +4608,47 @@ static void _feature_list_delete(void *x)
 	xfree(feature_ptr);
 }
 
-static int _valid_feature_list(struct job_record *job_ptr, List feature_list)
+static int _valid_batch_features(struct job_record *job_ptr, bool can_reboot)
 {
+	char *tmp, *tok, *save_ptr = NULL;
+	int rc = SLURM_SUCCESS;
+	bool have_or = false, success_or = false;
+
+	if (!job_ptr->batch_features)
+		return SLURM_SUCCESS;
+
+	if (strchr(job_ptr->batch_features, '|'))
+		have_or = true;
+	tmp = xstrdup(job_ptr->batch_features);
+	tok = strtok_r(tmp, "&|", &save_ptr);
+	while (tok) {
+		rc = _valid_node_feature(tok, can_reboot);
+		if (have_or) {
+			if (rc == SLURM_SUCCESS)
+				success_or = true;
+		} else if (rc != SLURM_SUCCESS)
+			break;
+		tok = strtok_r(NULL, "&|", &save_ptr);
+	}
+
+	if (have_or && success_or)
+		return SLURM_SUCCESS;
+	return rc;
+}
+
+static int _valid_feature_list(struct job_record *job_ptr, bool can_reboot)
+{
+	List feature_list = job_ptr->details->feature_list;
 	ListIterator feat_iter;
 	job_feature_t *feat_ptr;
 	char *buf = NULL, tmp[16];
 	int bracket = 0, paren = 0;
 	int rc = SLURM_SUCCESS;
-	bool can_reboot;
 
 	if (feature_list == NULL) {
 		debug2("Job %u feature list is empty", job_ptr->job_id);
 		return rc;
 	}
-
-	can_reboot = node_features_g_user_update(job_ptr->user_id);
 
 	feat_iter = list_iterator_create(feature_list);
 	while ((feat_ptr = (job_feature_t *)list_next(feat_iter))) {

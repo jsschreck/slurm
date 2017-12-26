@@ -155,9 +155,14 @@ with features "haswell" and "knl" respectively.
 On such a configuration the batch script would normally benefit by executing
 on a faster Haswell node.
 This would be specified using the option "\-\-batch=haswell".
+The specification can include AND and OR operators using the ampersand and
+vertical bar separators. For example:
+"\-\-batch=haswell|broadwell" or "\-\-batch=haswell|big_memory".
 The \-\-batch argument must be a subset of the job's
 \fB\-\-constraint\fR=<\fIlist\fR> argument (i.e. the job can not request only
 KNL nodes, but require the script to execute on a Haswell node).
+If the request can not be satisifed from the resources allocated to the job,
+the batch script will execute on the first node of the job allocation.
 
 .TP
 \fB\-\-bbf\fR=<\fIfile_name\fR>

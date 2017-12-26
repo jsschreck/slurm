@@ -3826,7 +3826,7 @@ extern void build_node_details(struct job_record *job_ptr, bool new_alloc)
 			error("Invalid node %s in JobId=%u",
 			      this_node_name, job_ptr->job_id);
 		}
-		if (job_ptr->batch_host == NULL)
+		if (!job_ptr->batch_host && !job_ptr->batch_features)
 			job_ptr->batch_host = xstrdup(this_node_name);
 		free(this_node_name);
 	}
@@ -3835,6 +3835,88 @@ extern void build_node_details(struct job_record *job_ptr, bool new_alloc)
 		error("Node count mismatch for JobId=%u (%u,%u)",
 		      job_ptr->job_id, job_ptr->node_cnt, node_inx);
 	}
+}
+
+/*
+ * Set "batch_host" for this job based upon it's "batch_features" and
+ * "node_bitmap". Selection is performed on a best-effort basis (i.e. if no
+ * node satisfies the batch_features specification then pick an arbitrary node.
+ * Return SLURM_SUCCESS or error code
+ */
+extern int pick_batch_host(struct job_record *job_ptr)
+{
+	int i, i_first;
+	struct node_record *node_ptr;
+	char *tmp, *tok, sep, last_sep = '&';
+	node_feature_t *feature_ptr;
+	ListIterator feature_iter;
+	bitstr_t *feature_bitmap;
+
+	if (!job_ptr && !job_ptr->node_bitmap) {
+		error("%s: Job %u lacks a node_bitmap", __func__,
+		      job_ptr->job_id);
+		return SLURM_ERROR;
+	}
+
+	i_first = bit_ffs(job_ptr->node_bitmap);
+	if (i_first < 0) {
+		error("%s: Job %u allocated no nodes", __func__,
+		      job_ptr->job_id);
+		return SLURM_ERROR;
+	}
+	if (!job_ptr->batch_features) {
+		/* Run batch script on first node of job allocation */
+		node_ptr = node_record_table_ptr + i_first;
+		job_ptr->batch_host = xstrdup(node_ptr->name);
+		return SLURM_SUCCESS;
+	}
+
+	feature_bitmap = bit_copy(job_ptr->node_bitmap);
+	tmp = xstrdup(job_ptr->batch_features);
+	tok = tmp;
+	for (i = 0; ; i++) {
+		if (tmp[i] == '&')
+			sep = '&';
+		else if (tmp[i] == '|')
+			sep = '|';
+		else if (tmp[i] == '\0')
+			sep = '\0';
+		else
+			continue;
+		tmp[i] = '\0';
+
+		feature_iter = list_iterator_create(active_feature_list);
+		while ((feature_ptr = (node_feature_t *)
+				      list_next(feature_iter))) {
+			if (xstrcmp(feature_ptr->name, tok))
+				continue;
+			if (last_sep == '&') {
+				bit_and(feature_bitmap,
+					feature_ptr->node_bitmap);
+			} else {
+				bit_or(feature_bitmap,
+				       feature_ptr->node_bitmap);
+			}
+			break;
+		}
+		list_iterator_destroy(feature_iter);
+		if (!feature_ptr)	/* No match */
+			bit_clear_all(feature_bitmap);
+		if (sep == '\0')
+			break;
+		tok = tmp + i + 1;
+		last_sep = sep;
+	}
+
+	bit_and(feature_bitmap, job_ptr->node_bitmap);
+	if ((i = bit_ffs(feature_bitmap)) >= 0)
+		node_ptr = node_record_table_ptr + i;
+	else
+		node_ptr = node_record_table_ptr + i_first;
+	job_ptr->batch_host = xstrdup(node_ptr->name);
+	FREE_NULL_BITMAP(feature_bitmap);
+
+	return SLURM_SUCCESS;
 }
 
 /*

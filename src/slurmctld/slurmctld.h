@@ -2026,6 +2026,14 @@ extern int part_policy_valid_qos(
 extern bool partition_in_use(char *part_name);
 
 /*
+ * Set "batch_host" for this job based upon it's "batch_features" and
+ * "node_bitmap". The selection is deferred in case a node's "active_features"
+ * is changed by a reboot.
+ * Return SLURM_SUCCESS or error code
+ */
+extern int pick_batch_host(struct job_record *job_ptr);
+
+/*
  * prolog_complete - note the normal termination of the prolog
  * IN job_id - id of the job which completed
  * IN prolog_return_code - prolog's return code,
