@@ -694,44 +694,89 @@ static void _find_feature_nodes(List feature_list, bool can_reboot)
  * IN job_ptr - job requesting resource allocation
  * IN node_set_ptr - Pointer to node_set being searched
  * OUT inactive_bitmap - Nodes with this as inactive feature
- * RET 1 if some nodes with this inactive feature, 0 no such inactive feature
- * NOTE: Currently supports only simple AND of features
+ * RET 1 if some nodes with this inactive feature, 0 no inactive feature
+ * NOTE: Currently fully supports only AND/OR of features, not XAND/XOR
  */
 static int _match_feature3(List feature_list, struct node_set *node_set_ptr,
 			   bitstr_t **inactive_bitmap)
 {
-	ListIterator feat_iter;
+	ListIterator job_feat_iter;
 	job_feature_t *job_feat_ptr;
-	node_feature_t *node_feat_ptr;
-	bitstr_t *tmp_bitmap = NULL;
+	int last_op = FEATURE_OP_AND, last_paren_op = FEATURE_OP_AND;
+	int i, last_paren_cnt = 0;
+	bitstr_t *feature_bitmap, *paren_bitmap = NULL, *work_bitmap;
+
+	xassert(inactive_bitmap);
 
 	if ((feature_list == NULL) ||		/* nothing to look for */
 	    (node_features_g_count() == 0))	/* No inactive features */
 		return 0;
 
-	feat_iter = list_iterator_create(feature_list);
-	while ((job_feat_ptr = (job_feature_t *) list_next(feat_iter))) {
-		node_feat_ptr = list_find_first(active_feature_list,
-						list_find_feature,
-						(void *)job_feat_ptr->name);
-		if ((node_feat_ptr == NULL) ||
-		    (node_feat_ptr->node_bitmap == NULL)) {
-			if (!tmp_bitmap)
-				tmp_bitmap = bit_alloc(node_record_count);
-			bit_nset(tmp_bitmap, 0, node_record_count - 1);
-		} else if (!tmp_bitmap) {
-			tmp_bitmap = bit_copy(node_feat_ptr->node_bitmap);
-			bit_not(tmp_bitmap);
-		} else {
-			bit_or_not(tmp_bitmap, node_feat_ptr->node_bitmap);
+	feature_bitmap = bit_alloc(node_record_count);
+	bit_set_all(feature_bitmap);
+	work_bitmap = feature_bitmap;
+	job_feat_iter = list_iterator_create(feature_list);
+	while ((job_feat_ptr = (job_feature_t *) list_next(job_feat_iter))) {
+		if (last_paren_cnt < job_feat_ptr->paren) {
+			/* Start of expression in parenthesis */
+			last_paren_op = last_op;
+			last_op = FEATURE_OP_AND;
+			paren_bitmap = bit_alloc(node_record_count);
+			bit_set_all(paren_bitmap);
+			work_bitmap = paren_bitmap;
 		}
-	}
-	list_iterator_destroy(feat_iter);
 
-	*inactive_bitmap = tmp_bitmap;
-	if (tmp_bitmap)
-		return 1;
-	return 0;
+		if (job_feat_ptr->node_bitmap_avail) {
+			if (last_op == FEATURE_OP_AND) {
+				bit_and(work_bitmap,
+					job_feat_ptr->node_bitmap_active);
+			} else if (last_op == FEATURE_OP_OR) {
+				bit_or(work_bitmap,
+				       job_feat_ptr->node_bitmap_active);
+			} else {	/* FEATURE_OP_XOR or FEATURE_OP_XAND */
+				bit_and(work_bitmap,
+				        job_feat_ptr->node_bitmap_active);
+			}
+		} else {	/* feature not found */
+			if (last_op == FEATURE_OP_AND) {
+				bit_nclear(work_bitmap, 0,
+					   (node_record_count - 1));
+			}
+		}
+
+		if (last_paren_cnt > job_feat_ptr->paren) {
+			/* End of expression in parenthesis */
+			if (last_paren_op == FEATURE_OP_AND) {
+				bit_and(feature_bitmap, work_bitmap);
+			} else if (last_paren_op == FEATURE_OP_OR) {
+				bit_or(feature_bitmap, work_bitmap);
+			} else {	/* FEATURE_OP_XOR or FEATURE_OP_XAND */
+				bit_and(feature_bitmap, work_bitmap);
+			}
+			FREE_NULL_BITMAP(paren_bitmap);
+			work_bitmap = feature_bitmap;
+		}
+
+		last_op = job_feat_ptr->op_code;
+		last_paren_cnt = job_feat_ptr->paren;
+	}
+	list_iterator_destroy(job_feat_iter);
+#if 0
+{
+	char tmp[32];
+	bit_fmt(tmp, sizeof(tmp), work_bitmap);
+	info("%s: NODE_BITMAP:%s", __func__, tmp);
+}
+#endif
+	FREE_NULL_BITMAP(paren_bitmap);
+	i = bit_ffc(feature_bitmap);
+	if (i == -1) {	/* No required node features inactive */
+		FREE_NULL_BITMAP(feature_bitmap);
+		return 0;
+	}
+	bit_not(feature_bitmap);
+	*inactive_bitmap = feature_bitmap;
+	return 1;
 }
 
 /*
@@ -3184,7 +3229,7 @@ static bool _valid_feature_counts(struct job_record *job_ptr,
 {
 	char tmp[32];
 	bit_fmt(tmp, sizeof(tmp), node_bitmap);
-	info("NODE_BITMAP:%s", tmp);
+	info("%s: NODE_BITMAP:%s", __func__, tmp);
 }
 #endif
 	return rc;
