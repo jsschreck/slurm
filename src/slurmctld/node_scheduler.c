@@ -723,9 +723,7 @@ static int _match_feature3(List feature_list, struct node_set *node_set_ptr,
 			tmp_bitmap = bit_copy(node_feat_ptr->node_bitmap);
 			bit_not(tmp_bitmap);
 		} else {
-			bit_not(node_feat_ptr->node_bitmap);
-			bit_or(tmp_bitmap, node_feat_ptr->node_bitmap);
-			bit_not(node_feat_ptr->node_bitmap);
+			bit_or_not(tmp_bitmap, node_feat_ptr->node_bitmap);
 		}
 	}
 	list_iterator_destroy(feat_iter);
