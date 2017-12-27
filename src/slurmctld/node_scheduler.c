@@ -3108,7 +3108,7 @@ static bool _valid_feature_counts(struct job_record *job_ptr,
 	job_feature_t *job_feat_ptr;
 	int last_op = FEATURE_OP_AND, last_paren_op = FEATURE_OP_AND;
 	int last_paren_cnt = 0;
-	bitstr_t *feature_bitmap, *paren_bitmap, *work_bitmap;
+	bitstr_t *feature_bitmap, *paren_bitmap = NULL, *work_bitmap;
 	bool rc = true, user_update;
 
 	xassert(detail_ptr);
@@ -3166,16 +3166,27 @@ static bool _valid_feature_counts(struct job_record *job_ptr,
 				bit_or(feature_bitmap, work_bitmap);
 			} else {	/* FEATURE_OP_XOR or FEATURE_OP_XAND */
 				*has_xor = true;
-				bit_or(work_bitmap,
-				       job_feat_ptr->node_bitmap_avail);
+				bit_or(feature_bitmap, work_bitmap);
 			}
+			FREE_NULL_BITMAP(paren_bitmap);
+			work_bitmap = feature_bitmap;
 		}
 
 		last_op = job_feat_ptr->op_code;
 		last_paren_cnt = job_feat_ptr->paren;
 	}
 	list_iterator_destroy(job_feat_iter);
-
+	if (rc)
+		bit_and(node_bitmap, work_bitmap);
+	FREE_NULL_BITMAP(feature_bitmap);
+	FREE_NULL_BITMAP(paren_bitmap);
+#if 0
+{
+	char tmp[32];
+	bit_fmt(tmp, sizeof(tmp), node_bitmap);
+	info("NODE_BITMAP:%s", tmp);
+}
+#endif
 	return rc;
 }
 
