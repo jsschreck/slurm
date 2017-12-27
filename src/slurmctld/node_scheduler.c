@@ -1141,6 +1141,8 @@ _get_req_features(struct node_set *node_set_ptr, int node_set_size,
 	if (job_ptr->details->feature_list) {
 		ListIterator feat_iter;
 		job_feature_t *feat_ptr;
+		int last_paren_cnt = 0, last_paren_opt = FEATURE_OP_AND;
+		bitstr_t *paren_bitmap = NULL, *work_bitmap;
 		uint64_t smallest_min_mem = INFINITE64;
 		uint64_t orig_req_mem = job_ptr->details->pn_min_memory;
 
@@ -1148,8 +1150,32 @@ _get_req_features(struct node_set *node_set_ptr, int node_set_size,
 				job_ptr->details->feature_list);
 		while ((feat_ptr = (job_feature_t *) list_next(feat_iter))) {
 			bool sort_again = false;
-			if (feat_ptr->count == 0)
+			if (last_paren_cnt < feat_ptr->paren) {
+				/* Start of expression in parenthesis */
+				paren_bitmap =
+					bit_copy(feat_ptr->node_bitmap_avail);
+				last_paren_opt = feat_ptr->op_code;
+				last_paren_cnt = feat_ptr->paren;
 				continue;
+			} else if (last_paren_cnt > 0) {
+				if (last_paren_opt == FEATURE_OP_AND) {
+					bit_and(paren_bitmap,
+						feat_ptr->node_bitmap_avail);
+				} else {
+					bit_or(paren_bitmap,
+					       feat_ptr->node_bitmap_avail);
+				}
+				last_paren_opt = feat_ptr->op_code;
+				last_paren_cnt = feat_ptr->paren;
+				if (last_paren_cnt)
+					continue;
+				work_bitmap = paren_bitmap;
+			} else
+				work_bitmap = feat_ptr->node_bitmap_avail;
+			if (feat_ptr->count == 0) {
+				FREE_NULL_BITMAP(paren_bitmap);
+				continue;
+			}
 			tmp_node_set_size = 0;
 			/*
 			 * _pick_best_nodes() is destructive of the node_set
@@ -1158,7 +1184,7 @@ _get_req_features(struct node_set *node_set_ptr, int node_set_size,
 			 */
 			for (i = 0; i < node_set_size; i++) {
 				if (!bit_super_set(node_set_ptr[i].my_bitmap,
-						   feat_ptr->node_bitmap_avail))
+						   work_bitmap))
 					continue;
 				tmp_node_set_ptr[tmp_node_set_size].
 					cpus_per_node =
@@ -1227,6 +1253,7 @@ _get_req_features(struct node_set *node_set_ptr, int node_set_size,
 				tmp_node_set_size++;
 				FREE_NULL_BITMAP(inactive_bitmap);
 			}
+			FREE_NULL_BITMAP(paren_bitmap);
 			feature_bitmap = NULL;
 			min_nodes = feat_ptr->count;
 			req_nodes = feat_ptr->count;
