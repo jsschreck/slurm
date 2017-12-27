@@ -114,8 +114,7 @@ static void _filter_nodes_in_set(struct node_set *node_set_ptr,
 static bool _first_array_task(struct job_record *job_ptr);
 static void _log_node_set(uint32_t job_id, struct node_set *node_set_ptr,
 			  int node_set_size);
-static int  _match_feature3(List feature_list, struct node_set *node_set_ptr,
-			    bitstr_t **inactive_bitmap);
+static int _match_feature(List feature_list, bitstr_t **inactive_bitmap);
 static int _nodes_in_sets(bitstr_t *req_bitmap,
 			  struct node_set * node_set_ptr,
 			  int node_set_size);
@@ -690,15 +689,13 @@ static void _find_feature_nodes(List feature_list, bool can_reboot)
 }
 
 /*
- * _match_feature3 - determine which of the job features are now inactive
+ * _match_feature - determine which of the job features are now inactive
  * IN job_ptr - job requesting resource allocation
- * IN node_set_ptr - Pointer to node_set being searched
  * OUT inactive_bitmap - Nodes with this as inactive feature
  * RET 1 if some nodes with this inactive feature, 0 no inactive feature
  * NOTE: Currently fully supports only AND/OR of features, not XAND/XOR
  */
-static int _match_feature3(List feature_list, struct node_set *node_set_ptr,
-			   bitstr_t **inactive_bitmap)
+static int _match_feature(List feature_list, bitstr_t **inactive_bitmap)
 {
 	ListIterator job_feat_iter;
 	job_feature_t *job_feat_ptr;
@@ -3539,8 +3536,8 @@ static int _build_node_list(struct job_record *job_ptr,
 		}
 		if (test_only || !can_reboot)
 			continue;
-		if (!_match_feature3(job_ptr->details->feature_list,
-				     prev_node_set_ptr, &inactive_bitmap))
+		if (!_match_feature(job_ptr->details->feature_list,
+				     &inactive_bitmap))
 			continue;
 
 		if (bit_equal(prev_node_set_ptr->my_bitmap, inactive_bitmap)) {
