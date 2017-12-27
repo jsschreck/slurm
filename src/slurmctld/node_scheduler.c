@@ -3437,6 +3437,7 @@ static int _build_node_list(struct job_record *job_ptr,
 		return ESLURM_REQUESTED_NODE_CONFIG_UNAVAILABLE;
 	}
 
+	(void) _match_feature(job_ptr->details->feature_list, &inactive_bitmap);
 	node_set_inx = 0;
 	node_set_len = list_count(config_list) * 4 + 1;
 	node_set_ptr = (struct node_set *)
@@ -3536,14 +3537,13 @@ static int _build_node_list(struct job_record *job_ptr,
 		}
 		if (test_only || !can_reboot)
 			continue;
-		if (!_match_feature(job_ptr->details->feature_list,
-				     &inactive_bitmap))
-			continue;
 
-		if (bit_equal(prev_node_set_ptr->my_bitmap, inactive_bitmap)) {
+		if (!inactive_bitmap)	/* All features active */
+			continue;
+		if (bit_super_set(prev_node_set_ptr->my_bitmap,
+				  inactive_bitmap)) {
 			/* All nodes require reboot, just change weight */
 			prev_node_set_ptr->weight = INFINITE;
-			FREE_NULL_BITMAP(inactive_bitmap);
 			continue;
 		}
 		/*
@@ -3562,10 +3562,10 @@ static int _build_node_list(struct job_record *job_ptr,
 		node_set_ptr[node_set_inx].real_memory =
 			config_ptr->real_memory;
 		node_set_ptr[node_set_inx].weight = INFINITE;
-		bit_and_not(node_set_ptr[node_set_inx-1].my_bitmap,inactive_bitmap);
+		bit_and_not(node_set_ptr[node_set_inx-1].my_bitmap,
+			    inactive_bitmap);
 		node_set_ptr[node_set_inx-1].nodes -= bit_set_count(
 			node_set_ptr[node_set_inx-1].my_bitmap);
-		FREE_NULL_BITMAP(inactive_bitmap);
 		node_set_inx++;
 		if (node_set_inx >= node_set_len) {
 			error("%s: node_set buffer filled", __func__);
@@ -3573,6 +3573,7 @@ static int _build_node_list(struct job_record *job_ptr,
 		}
 	}
 	list_iterator_destroy(config_iterator);
+	FREE_NULL_BITMAP(inactive_bitmap);
 	/* eliminate any incomplete node_set record */
 	xfree(node_set_ptr[node_set_inx].features);
 	FREE_NULL_BITMAP(node_set_ptr[node_set_inx].my_bitmap);
