@@ -2549,8 +2549,9 @@ extern int node_features_p_job_valid(char *job_features)
 {
 	uint16_t job_mcdram, job_numa;
 	int mcdram_cnt, numa_cnt;
+	int last_mcdram_cnt = 0, last_numa_cnt = 0;
 	int rc = SLURM_SUCCESS;
-	char *tmp, *tok, *save_ptr = NULL;
+	char last_sep = '\0', *tmp, *tok, *save_ptr = NULL;
 
 	if ((job_features == NULL) || (job_features[0] == '\0'))
 		return SLURM_SUCCESS;
@@ -2558,20 +2559,30 @@ extern int node_features_p_job_valid(char *job_features)
 	tmp = xstrdup(job_features);
 	tok = strtok_r(tmp, "[]()|", &save_ptr);
 	while (tok) {
+		last_sep = tok[strlen(tok) - 1];
 		job_mcdram = _knl_mcdram_parse(tok, "&,*");
-		mcdram_cnt = _knl_mcdram_bits_cnt(job_mcdram);
+		mcdram_cnt = _knl_mcdram_bits_cnt(job_mcdram) + last_mcdram_cnt;
 		if (mcdram_cnt > 1) {		/* Multiple MCDRAM options */
 			rc = ESLURM_INVALID_KNL;
 			break;
 		}
 
 		job_numa = _knl_numa_parse(tok, "&,*");
-		numa_cnt = _knl_numa_bits_cnt(job_numa);
+		numa_cnt = _knl_numa_bits_cnt(job_numa) + last_numa_cnt;
 		if (numa_cnt > 1) {		/* Multiple NUMA options */
 			rc = ESLURM_INVALID_KNL;
 			break;
 		}
 		tok = strtok_r(NULL, "[]()|", &save_ptr);
+		if (tok &&
+		    ((last_sep == '&') ||	/* e.g. "equal&(flat|cache)" */
+		     (tok[0] == '&'))) {	/* e.g. "(flat|cache)&equal" */
+			last_mcdram_cnt += mcdram_cnt;
+			last_numa_cnt += numa_cnt;
+		} else {
+			last_mcdram_cnt = 0;
+			last_numa_cnt = 0;
+		}
 	}
 	xfree(tmp);
 
