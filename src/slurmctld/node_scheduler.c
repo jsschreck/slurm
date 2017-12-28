@@ -705,7 +705,7 @@ static int _match_feature(List feature_list, bitstr_t **inactive_bitmap)
 
 	xassert(inactive_bitmap);
 
-	if ((feature_list == NULL) ||		/* nothing to look for */
+	if (!feature_list ||			/* nothing to look for */
 	    (node_features_g_count() == 0))	/* No inactive features */
 		return 0;
 
@@ -784,58 +784,33 @@ static int _match_feature(List feature_list, bitstr_t **inactive_bitmap)
  * IN avail_bitmap - nodes currently available for this job
  * OUT active_bitmap - nodes with job's features currently active, NULL if
  *	identical to avail_bitmap
- * NOTE: Currently supports only simple AND of features
+ * NOTE: Currently fully supports only AND/OR of features, not XAND/XOR
  */
 extern void build_active_feature_bitmap(struct job_record *job_ptr,
 					bitstr_t *avail_bitmap,
 					bitstr_t **active_bitmap)
 {
 	struct job_details *details_ptr = job_ptr->details;
-	ListIterator feat_iter;
-	job_feature_t *job_feat_ptr;
-	node_feature_t *node_feat_ptr;
 	bitstr_t *tmp_bitmap = NULL;
+	bool can_reboot;
 
 	*active_bitmap = NULL;
-	if (details_ptr->feature_list == NULL)
-		return;	/* nothing to look for */
+	if (!details_ptr->feature_list ||	/* nothing to look for */
+	    (node_features_g_count() == 0))	/* No inactive features */
+		return;
 
-	feat_iter = list_iterator_create(details_ptr->feature_list);
-	while ((job_feat_ptr = (job_feature_t *) list_next(feat_iter))) {
-		if (!node_features_g_changible_feature(job_feat_ptr->name))
-			continue;
+	can_reboot = node_features_g_user_update(job_ptr->user_id);
+	_find_feature_nodes(details_ptr->feature_list, can_reboot);
+	if (_match_feature(details_ptr->feature_list, &tmp_bitmap) == 0)
+		return;		/* No inactive features */
 
-		node_feat_ptr = list_find_first(active_feature_list,
-						list_find_feature,
-						(void *)job_feat_ptr->name);
-		if ((node_feat_ptr == NULL) ||
-		    (node_feat_ptr->node_bitmap == NULL)) {
-			if (!tmp_bitmap)
-				tmp_bitmap = bit_alloc(node_record_count);
-			bit_nset(tmp_bitmap, 0, node_record_count - 1);
-			continue;
-		}
-		if (!tmp_bitmap) {
-			tmp_bitmap = bit_copy(node_feat_ptr->node_bitmap);
-			bit_not(tmp_bitmap);
-		} else {
-			bit_not(node_feat_ptr->node_bitmap);
-			bit_or(tmp_bitmap, node_feat_ptr->node_bitmap);
-			bit_not(node_feat_ptr->node_bitmap);
-		}
+	bit_not(tmp_bitmap);
+	if (bit_super_set(avail_bitmap, tmp_bitmap)) {
+		FREE_NULL_BITMAP(tmp_bitmap);
+		return;
 	}
-	list_iterator_destroy(feat_iter);
-
-	if (tmp_bitmap) {
-		bit_not(tmp_bitmap);
-		if (bit_super_set(avail_bitmap, tmp_bitmap)) {
-			FREE_NULL_BITMAP(tmp_bitmap);
-		} else {
-			bit_and(tmp_bitmap, avail_bitmap);
-			*active_bitmap = tmp_bitmap;
-		}
-	}
-
+	bit_and(tmp_bitmap, avail_bitmap);
+	*active_bitmap = tmp_bitmap;
 	return;
 }
 
