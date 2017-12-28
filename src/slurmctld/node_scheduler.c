@@ -645,6 +645,9 @@ static void _find_feature_nodes(List feature_list, bool can_reboot)
 		if (node_feat_ptr && node_feat_ptr->node_bitmap) {
 			job_feat_ptr->node_bitmap_active =
 				bit_copy(node_feat_ptr->node_bitmap);
+		} else {	/* This feature not active */
+			job_feat_ptr->node_bitmap_active =
+				bit_alloc(node_record_count);
 		}
 		if (can_reboot &&
 		    node_features_g_changible_feature(job_feat_ptr->name)) {
@@ -654,6 +657,9 @@ static void _find_feature_nodes(List feature_list, bool can_reboot)
 			if (node_feat_ptr && node_feat_ptr->node_bitmap) {
 				job_feat_ptr->node_bitmap_avail =
 					bit_copy(node_feat_ptr->node_bitmap);
+			} else {   /* This feature not available */
+				job_feat_ptr->node_bitmap_avail =
+					bit_alloc(node_record_count);
 			}
 		} else if (job_feat_ptr->node_bitmap_active) {
 			job_feat_ptr->node_bitmap_avail =
