@@ -2600,7 +2600,7 @@ extern char *node_features_p_job_xlate(char *job_features)
 		return node_features;
 
 	tmp = xstrdup(job_features);
-	tok = strtok_r(tmp, "&", &save_ptr);
+	tok = strtok_r(tmp, "[]()|&", &save_ptr);
 	while (tok) {
 		bool knl_opt = false;
 		if (_knl_mcdram_token(tok)) {
@@ -2619,7 +2619,7 @@ extern char *node_features_p_job_xlate(char *job_features)
 			xstrfmtcat(node_features, "%s%s", sep, tok);
 			sep = ",";
 		}
-		tok = strtok_r(NULL, "&", &save_ptr);
+		tok = strtok_r(NULL, "[]()|&", &save_ptr);
 	}
 	xfree(tmp);
 
