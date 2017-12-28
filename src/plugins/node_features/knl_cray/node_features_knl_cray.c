@@ -2593,7 +2593,7 @@ extern int node_features_p_job_valid(char *job_features)
 extern char *node_features_p_job_xlate(char *job_features)
 {
 	char *node_features = NULL;
-	char *tmp, *save_ptr = NULL, *sep = "", *tok;
+	char *tmp, *save_ptr = NULL, *mult, *sep = "", *tok;
 	bool has_numa = false, has_mcdram = false;
 
 	if ((job_features == NULL) || (job_features[0] ==  '\0'))
@@ -2603,6 +2603,8 @@ extern char *node_features_p_job_xlate(char *job_features)
 	tok = strtok_r(tmp, "[]()|&", &save_ptr);
 	while (tok) {
 		bool knl_opt = false;
+		if ((mult = strchr(tok, '*')))
+			mult[0] = '\0';
 		if (_knl_mcdram_token(tok)) {
 			if (!has_mcdram) {
 				has_mcdram = true;
