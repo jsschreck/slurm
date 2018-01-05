@@ -1781,6 +1781,11 @@ extern int load_all_part_state ( void );
 extern int load_step_state(struct job_record *job_ptr, Buf buffer,
 			   uint16_t protocol_version);
 
+/*
+ * Log contents of avail_feature_list and active_feature_list
+ */
+extern void log_feature_lists(void);
+
 /* make_node_alloc - flag specified node as allocated to a job
  * IN node_ptr - pointer to node being allocated
  * IN job_ptr  - pointer to job that is starting

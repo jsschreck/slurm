@@ -1393,15 +1393,16 @@ static void _list_delete_feature(void *feature_entry)
 	xfree (feature_ptr);
 }
 
-/* For a configuration where available_features == active_features,
- * build new active and available feature lists */
+/*
+ * For a configuration where available_features == active_features,
+ * build new active and available feature lists
+ */
 extern void build_feature_list_eq(void)
 {
 	ListIterator config_iterator;
 	struct config_record *config_ptr;
 	node_feature_t *active_feature_ptr, *avail_feature_ptr;
 	ListIterator feature_iter;
-
 	char *tmp_str, *token, *last = NULL;
 
 	FREE_NULL_LIST(active_feature_list);
@@ -1438,8 +1439,36 @@ extern void build_feature_list_eq(void)
 	list_iterator_destroy(feature_iter);
 }
 
-/* For a configuration where available_features != active_features,
- * build new active and available feature lists */
+/*
+ * Log contents of avail_feature_list and active_feature_list
+ */
+extern void log_feature_lists(void)
+{
+	node_feature_t *feature_ptr;
+	char *node_str;
+	ListIterator feature_iter;
+
+	feature_iter = list_iterator_create(avail_feature_list);
+	while ((feature_ptr = (node_feature_t *)list_next(feature_iter))) {
+		node_str = bitmap2node_name(feature_ptr->node_bitmap);
+		info("AVAIL FEATURE:%s NODES:%s", feature_ptr->name, node_str);
+		xfree(node_str);
+	}
+	list_iterator_destroy(feature_iter);
+
+	feature_iter = list_iterator_create(active_feature_list);
+	while ((feature_ptr = (node_feature_t *)list_next(feature_iter))) {
+		node_str = bitmap2node_name(feature_ptr->node_bitmap);
+		info("ACTIVE FEATURE:%s NODES:%s", feature_ptr->name, node_str);
+		xfree(node_str);
+	}
+	list_iterator_destroy(feature_iter);
+}
+
+/*
+ * For a configuration where available_features != active_features,
+ * build new active and available feature lists
+ */
 extern void build_feature_list_ne(void)
 {
 	struct node_record *node_ptr;
