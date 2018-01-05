@@ -68,7 +68,7 @@ typedef struct node_features_ops {
 	bool	(*node_update_valid) (void *node_ptr,
 				      update_node_msg_t *update_node_msg);
 	char *	(*node_xlate)	(char *new_features, char *orig_features,
-				 char *avail_features);
+				 char *avail_features, int node_inx);
 	char *	(*node_xlate2)	(char *new_features);
 	void	(*step_config)	(bool mem_sort, bitstr_t *numa_bitmap);
 	int	(*reconfig)	(void);
@@ -435,10 +435,11 @@ extern bool node_features_g_node_update_valid(void *node_ptr,
  * IN new_features - newly active features
  * IN orig_features - original active features
  * IN avail_features - original available features
+ * IN node_inx - index of node in node table
  * RET node's new merged features, must be xfreed
  */
 extern char *node_features_g_node_xlate(char *new_features, char *orig_features,
-					char *avail_features)
+					char *avail_features, int node_inx)
 {
 	DEF_TIMERS;
 	char *new_value = NULL, *tmp_str;
@@ -455,7 +456,7 @@ extern char *node_features_g_node_xlate(char *new_features, char *orig_features,
 		else
 			tmp_str = NULL;
 		new_value = (*(ops[i].node_xlate))(new_features, tmp_str,
-						   avail_features);
+						   avail_features, node_inx);
 		xfree(tmp_str);
 
 	}

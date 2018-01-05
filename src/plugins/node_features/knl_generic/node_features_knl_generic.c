@@ -185,6 +185,7 @@ static pthread_t ume_thread = 0;
 /* Percentage of MCDRAM used for cache by type, updated from syscfg */
 static int mcdram_pct[KNL_MCDRAM_CNT];
 static uint64_t *mcdram_per_node = NULL;
+static bitstr_t *knl_node_bitmap = NULL;	/* KNL nodes found by syscfg */
 
 static s_p_options_t knl_conf_file_options[] = {
 	{"AllowMCDRAM", S_P_STRING},
@@ -958,6 +959,7 @@ extern int fini(void)
 	xfree(mc_path);
 	xfree(numa_cpu_bind);
 	xfree(syscfg_path);
+	FREE_NULL_BITMAP(knl_node_bitmap);
 
 	return SLURM_SUCCESS;
 }
@@ -1799,10 +1801,11 @@ extern bool node_features_p_changible_feature(char *feature)
  * IN new_features - newly active features
  * IN orig_features - original active features
  * IN avail_features - original available features
+ * IN node_inx - index of node in node table
  * RET node's new merged features, must be xfreed
  */
 extern char *node_features_p_node_xlate(char *new_features, char *orig_features,
-					char *avail_features)
+					char *avail_features, int node_inx)
 {
 	char *node_features = NULL;
 	char *tmp, *save_ptr = NULL, *sep = "", *tok;
@@ -1887,6 +1890,12 @@ extern char *node_features_p_node_xlate(char *new_features, char *orig_features,
 			xstrfmtcat(node_features, "%s%s", sep, tmp);
 			xfree(tmp);
 		}
+	}
+
+	if (is_knl) {
+		if (!knl_node_bitmap)
+			knl_node_bitmap = bit_alloc(node_record_count);
+		bit_set(knl_node_bitmap, node_inx);
 	}
 
 	return node_features;
