@@ -61,6 +61,7 @@ typedef struct node_features_ops {
 	int	(*get_node)	(char *node_list);
 	int	(*job_valid)	(char *job_features);
 	char *	(*job_xlate)	(char *job_features);
+	bitstr_t * (*get_node_bitmap) (void);
 	bool	(*node_power)	(void);
 	int	(*node_set)	(char *active_features);
 	void	(*node_state)	(char **avail_modes, char **current_mode);
@@ -85,6 +86,7 @@ static const char *syms[] = {
 	"node_features_p_get_node",
 	"node_features_p_job_valid",
 	"node_features_p_job_xlate",
+	"node_features_p_get_node_bitmap",
 	"node_features_p_node_power",
 	"node_features_p_node_set",
 	"node_features_p_node_state",
@@ -313,6 +315,27 @@ extern char *node_features_g_job_xlate(char *job_features)
 	END_TIMER2("node_features_g_job_xlate");
 
 	return node_features;
+}
+
+/* Return bitmap of KNL nodes, NULL if none identified */
+extern bitstr_t *node_features_g_get_node_bitmap(void)
+{
+	DEF_TIMERS;
+	bitstr_t *node_bitmap = NULL;
+	int i;
+
+	START_TIMER;
+	(void) node_features_g_init();
+	slurm_mutex_lock(&g_context_lock);
+	for (i = 0; i < g_context_cnt; i++) {
+		node_bitmap = (*(ops[i].get_node_bitmap))();
+		if (node_bitmap)
+			break;
+	}
+	slurm_mutex_unlock(&g_context_lock);
+	END_TIMER2("node_features_g_get_node_bitmap");
+
+	return node_bitmap;
 }
 
 /* Return true if the plugin requires PowerSave mode for booting nodes */

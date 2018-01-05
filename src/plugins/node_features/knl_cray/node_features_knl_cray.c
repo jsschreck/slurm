@@ -2649,6 +2649,14 @@ extern char *node_features_p_job_xlate(char *job_features)
 	return node_features;
 }
 
+/* Return bitmap of KNL nodes, NULL if none identified */
+extern bitstr_t *node_features_p_get_node_bitmap(void)
+{
+	if (knl_node_bitmap)
+		return bit_copy(knl_node_bitmap);
+	return NULL;
+}
+
 /* Return true if the plugin requires PowerSave mode for booting nodes */
 extern bool node_features_p_node_power(void)
 {

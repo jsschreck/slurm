@@ -1608,6 +1608,14 @@ extern int node_features_p_node_set(char *active_features)
 	return error_code;
 }
 
+/* Return bitmap of KNL nodes, NULL if none identified */
+extern bitstr_t *node_features_p_get_node_bitmap(void)
+{
+	if (knl_node_bitmap)
+		return bit_copy(knl_node_bitmap);
+	return NULL;
+}
+
 /* Return true if the plugin requires PowerSave mode for booting nodes */
 extern bool node_features_p_node_power(void)
 {
