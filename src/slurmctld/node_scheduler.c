@@ -817,7 +817,44 @@ extern void build_active_feature_bitmap(struct job_record *job_ptr,
 	}
 	bit_and(tmp_bitmap, avail_bitmap);
 	*active_bitmap = tmp_bitmap;
+
 	return;
+}
+
+/* Return bitmap of nodes with all specified features currently active */
+extern bitstr_t *build_active_feature_bitmap2(char *reboot_features)
+{
+	char *tmp, *sep;
+	bitstr_t *active_node_bitmap = NULL;
+	node_feature_t *node_feat_ptr;
+
+	if (!reboot_features || (reboot_features[0] == '\0'))
+		return NULL;
+
+	tmp = xstrdup(reboot_features);
+	sep = strchr(tmp, ',');
+	if (sep) {
+		sep[0] = '\0';
+		node_feat_ptr = list_find_first(active_feature_list,
+						list_find_feature, sep + 1);
+		if (node_feat_ptr && node_feat_ptr->node_bitmap) {
+			active_node_bitmap =
+				bit_copy(node_feat_ptr->node_bitmap);
+		}
+	}
+	node_feat_ptr = list_find_first(active_feature_list, list_find_feature,
+					tmp);
+	if (node_feat_ptr && node_feat_ptr->node_bitmap) {
+		if (active_node_bitmap) {
+			bit_and(active_node_bitmap, node_feat_ptr->node_bitmap);
+		} else {
+			active_node_bitmap =
+				bit_copy(node_feat_ptr->node_bitmap);
+		}
+	}
+	xfree(tmp);
+
+	return active_node_bitmap;
 }
 
 /*
