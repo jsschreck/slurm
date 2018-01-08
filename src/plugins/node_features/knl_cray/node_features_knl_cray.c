@@ -2589,7 +2589,11 @@ extern int node_features_p_job_valid(char *job_features)
 	return rc;
 }
 
-/* Translate a job's feature request to the node features needed at boot time */
+/*
+ * Translate a job's feature request to the node features needed at boot time
+ * IN job_features - job's --constraint specification
+ * RET features required on node reboot. Must xfree to release memory
+ */
 extern char *node_features_p_job_xlate(char *job_features)
 {
 	char *node_features = NULL;
@@ -2630,7 +2634,7 @@ extern char *node_features_p_job_xlate(char *job_features)
 	 * In that case, do not set the default any MCDRAM or NUMA features.
 	 */
 	if (!has_mcdram && !has_numa)
-		return xstrdup(job_features);
+		return NULL;
 
 	/* Add default options */
 	if (!has_mcdram) {
