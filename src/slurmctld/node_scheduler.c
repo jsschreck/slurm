@@ -828,8 +828,10 @@ extern bitstr_t *build_active_feature_bitmap2(char *reboot_features)
 	bitstr_t *active_node_bitmap = NULL;
 	node_feature_t *node_feat_ptr;
 
-	if (!reboot_features || (reboot_features[0] == '\0'))
-		return NULL;
+	if (!reboot_features || (reboot_features[0] == '\0')) {
+		active_node_bitmap = bit_alloc(node_record_count);
+		return active_node_bitmap;
+	}
 
 	tmp = xstrdup(reboot_features);
 	sep = strchr(tmp, ',');
@@ -840,6 +842,8 @@ extern bitstr_t *build_active_feature_bitmap2(char *reboot_features)
 		if (node_feat_ptr && node_feat_ptr->node_bitmap) {
 			active_node_bitmap =
 				bit_copy(node_feat_ptr->node_bitmap);
+		} else {
+			active_node_bitmap = bit_alloc(node_record_count);
 		}
 	}
 	node_feat_ptr = list_find_first(active_feature_list, list_find_feature,
@@ -850,6 +854,12 @@ extern bitstr_t *build_active_feature_bitmap2(char *reboot_features)
 		} else {
 			active_node_bitmap =
 				bit_copy(node_feat_ptr->node_bitmap);
+		}
+	} else {
+		if (active_node_bitmap) {
+			bit_clear_all(active_node_bitmap);
+		} else {
+			active_node_bitmap = bit_alloc(node_record_count);
 		}
 	}
 	xfree(tmp);

@@ -4034,33 +4034,47 @@ static void *_run_epilog(void *arg)
 
 /* Determine which nodes must be rebooted for a job
  * IN job_ptr - pointer to job that will be initiated
- * RET bitmap of nodes requiring a reboot
+ * RET bitmap of nodes requiring a reboot for NodeFeaturesPlugin or NULL if none
  */
 extern bitstr_t *node_features_reboot(struct job_record *job_ptr)
 {
 	bitstr_t *active_bitmap = NULL, *boot_node_bitmap = NULL;
-
-	if (job_ptr->reboot) {
-		boot_node_bitmap = bit_copy(job_ptr->node_bitmap);
-		return boot_node_bitmap;
-	}
+	bitstr_t *feature_node_bitmap, *tmp_bitmap;
+	char *reboot_features;
 
 	if ((node_features_g_count() == 0) ||
 	    !node_features_g_user_update(job_ptr->user_id))
 		return NULL;
 
+	/*
+	 * Check if all features supported with AND/OR combinations
+	 */
 	build_active_feature_bitmap(job_ptr, job_ptr->node_bitmap,
 				    &active_bitmap);
-	if (active_bitmap == NULL)	/* All have desired features */
+	if (active_bitmap == NULL)	/* All nodes have desired features */
+		return NULL;
+	bit_free(active_bitmap);
+
+	/*
+	 * If some XOR/XAND option, filter out only first set of features
+	 * for NodeFeaturesPlugin
+	 */
+	feature_node_bitmap = node_features_g_get_node_bitmap();
+	if (feature_node_bitmap == NULL) /* No nodes under NodeFeaturesPlugin */
 		return NULL;
 
+	reboot_features = node_features_g_job_xlate(job_ptr->details->features);
+	tmp_bitmap = build_active_feature_bitmap2(reboot_features);
+	xfree(reboot_features);
 	boot_node_bitmap = bit_copy(job_ptr->node_bitmap);
-	bit_and_not(boot_node_bitmap, active_bitmap);
-	FREE_NULL_BITMAP(active_bitmap);
-	if (bit_set_count(boot_node_bitmap) == 0)
+	bit_and(boot_node_bitmap, feature_node_bitmap);
+	bit_free(feature_node_bitmap);
+	if (tmp_bitmap) {
+		bit_and_not(boot_node_bitmap, tmp_bitmap);
+		bit_free(tmp_bitmap);
+	}
+	if (bit_ffs(boot_node_bitmap) == -1)
 		FREE_NULL_BITMAP(boot_node_bitmap);
-	else
-		job_ptr->wait_all_nodes = 1;
 
 	return boot_node_bitmap;
 }
