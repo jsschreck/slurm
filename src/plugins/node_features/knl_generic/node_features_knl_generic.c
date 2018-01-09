@@ -1292,14 +1292,14 @@ extern int node_features_p_job_valid(char *job_features)
 		last_sep = tok[strlen(tok) - 1];
 		job_mcdram = _knl_mcdram_parse(tok, "&,*");
 		mcdram_cnt = _knl_mcdram_bits_cnt(job_mcdram) + last_mcdram_cnt;
-		if (mcdram_cnt > 1) {		/* Multiple MCDRAM options */
+		if (mcdram_cnt > 1) {	/* Multiple ANDed MCDRAM options */
 			rc = ESLURM_INVALID_KNL;
 			break;
 		}
 
 		job_numa = _knl_numa_parse(tok, "&,*");
 		numa_cnt = _knl_numa_bits_cnt(job_numa) + last_numa_cnt;
-		if (numa_cnt > 1) {		/* Multiple NUMA options */
+		if (numa_cnt > 1) {	/* Multiple ANDed NUMA options */
 			rc = ESLURM_INVALID_KNL;
 			break;
 		}
@@ -1320,7 +1320,8 @@ extern int node_features_p_job_valid(char *job_features)
 }
 
 /*
- * Translate a job's feature request to the node features needed at boot time
+ * Translate a job's feature request to the node features needed at boot time.
+ *	If multiple MCDRAM or NUMA values are ORed, pick the first ones.
  * IN job_features - job's --constraint specification
  * RET features required on node reboot. Must xfree to release memory
  */
