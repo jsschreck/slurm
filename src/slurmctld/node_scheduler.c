@@ -3243,10 +3243,8 @@ static bool _valid_feature_counts(struct job_record *job_ptr,
 				       job_feat_ptr->node_bitmap_avail);
 			}
 		} else {	/* feature not found */
-			if (last_op == FEATURE_OP_AND) {
-				bit_nclear(work_bitmap, 0,
-					   (node_record_count - 1));
-			}
+			if (last_op == FEATURE_OP_AND)
+				bit_clear_all(work_bitmap);
 		}
 		if (job_feat_ptr->count) {
 			if (bit_set_count(work_bitmap) < job_feat_ptr->count) {

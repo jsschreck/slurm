@@ -295,7 +295,12 @@ static bool _many_pending_rpcs(void)
 	return false;
 }
 
-/* test if job has feature count specification */
+/*
+ * Report summary of job's feature specification
+ * IN job_ptr - job to schedule
+ * OUT has_xor - true of features are XORed together
+ * RET Total count for ALL job features, even counts with XAND separator
+ */
 static int _num_feature_count(struct job_record *job_ptr, bool *has_xor)
 {
 	struct job_details *detail_ptr = job_ptr->details;
@@ -303,6 +308,7 @@ static int _num_feature_count(struct job_record *job_ptr, bool *has_xor)
 	ListIterator feat_iter;
 	job_feature_t *feat_ptr;
 
+	*has_xor = false;
 	if (detail_ptr->feature_list == NULL)	/* no constraints */
 		return rc;
 
@@ -326,7 +332,8 @@ static int _clear_qos_blocked_times(void *x, void *arg)
 	return 0;
 }
 
-/* Attempt to schedule a specific job on specific available nodes
+/*
+ * Attempt to schedule a specific job on specific available nodes
  * IN job_ptr - job to schedule
  * IN/OUT avail_bitmap - nodes available/selected to use
  * IN exc_core_bitmap - cores which can not be used
@@ -347,13 +354,13 @@ static int  _try_sched(struct job_record *job_ptr, bitstr_t **avail_bitmap,
 	job_feature_t *feat_ptr;
 
 	if (feat_cnt) {
-		/* Ideally schedule the job feature by feature,
-		 * but I don't want to add that complexity here
-		 * right now, so clear the feature counts and try
-		 * to schedule. This will work if there is only
-		 * one feature count. It should work fairly well
-		 * in cases where there are multiple feature
-		 * counts. */
+		/*
+		 * Ideally schedule the job feature by feature, but I don't
+		 * want to add that complexity here right now, so clear the
+		 * feature counts and try to schedule. This will work if there
+		 * is only one feature count. It should work fairly well in
+		 * cases where there are multiple feature counts.
+		 */
 		int i = 0, list_size;
 		uint16_t *feat_cnt_orig = NULL, high_cnt = 0;
 
@@ -393,8 +400,10 @@ static int  _try_sched(struct job_record *job_ptr, bitstr_t **avail_bitmap,
 		list_iterator_destroy(feat_iter);
 		xfree(feat_cnt_orig);
 	} else if (has_xor) {
-		/* Cache the feature information and test the individual
-		 * features, one at a time */
+		/*
+		 * Cache the feature information and test the individual
+		 * features, one at a time
+		 */
 		job_feature_t feature_base;
 		List feature_cache = detail_ptr->feature_list;
 		time_t low_start = 0;
