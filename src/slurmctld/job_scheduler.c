@@ -115,7 +115,6 @@ static char **	_build_env(struct job_record *job_ptr, bool is_epilog);
 static batch_job_launch_msg_t *_build_launch_job_msg(struct job_record *job_ptr,
 						     uint16_t protocol_version);
 static void	_depend_list_del(void *dep_ptr);
-static void	_feature_list_delete(void *x);
 static void	_job_queue_append(List job_queue, struct job_record *job_ptr,
 				  struct part_record *part_ptr, uint32_t priority);
 static void	_job_queue_rec_del(void *x);
@@ -4540,7 +4539,7 @@ extern List feature_list_copy(List feature_list_src)
 	if (!feature_list_src)
 		return feature_list_dest;
 
-	feature_list_dest = list_create(_feature_list_delete);
+	feature_list_dest = list_create(feature_list_delete);
 	iter = list_iterator_create(feature_list_src);
 	while ((feat_src = (job_feature_t *) list_next(iter))) {
 		feat_dest = xmalloc(sizeof(job_feature_t));
@@ -4584,7 +4583,7 @@ extern int build_feature_list(struct job_record *job_ptr)
 		str_ptr[0] = '&';
 
 	tmp_requested = xstrdup(detail_ptr->features);
-	detail_ptr->feature_list = list_create(_feature_list_delete);
+	detail_ptr->feature_list = list_create(feature_list_delete);
 	for (i = 0; ; i++) {
 		if (tmp_requested[i] == '*') {
 			tmp_requested[i] = '\0';
@@ -4696,7 +4695,10 @@ extern int build_feature_list(struct job_record *job_ptr)
 	return _valid_feature_list(job_ptr, can_reboot);
 }
 
-static void _feature_list_delete(void *x)
+/*
+ * Delete a record from a job's feature_list
+ */
+extern void feature_list_delete(void *x)
 {
 	job_feature_t *feature_ptr = (job_feature_t *)x;
 	xfree(feature_ptr->name);

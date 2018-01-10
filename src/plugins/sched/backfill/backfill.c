@@ -402,21 +402,32 @@ static int  _try_sched(struct job_record *job_ptr, bitstr_t **avail_bitmap,
 	} else if (has_xor) {
 		/*
 		 * Cache the feature information and test the individual
-		 * features, one at a time
+		 * features (or sets of features in parenthesis), one at a time
 		 */
-		job_feature_t feature_base;
+		job_feature_t *feature_base;
 		List feature_cache = detail_ptr->feature_list;
 		time_t low_start = 0;
-
-		detail_ptr->feature_list = list_create(NULL);
-		feature_base.count = 0;
-		feature_base.op_code = FEATURE_OP_END;
-		list_append(detail_ptr->feature_list, &feature_base);
 
 		tmp_bitmap = bit_copy(*avail_bitmap);
 		feat_iter = list_iterator_create(feature_cache);
 		while ((feat_ptr = (job_feature_t *) list_next(feat_iter))) {
-			feature_base.name = feat_ptr->name;
+			detail_ptr->feature_list =
+				list_create(feature_list_delete);
+			feature_base = xmalloc(sizeof(job_feature_t));
+			feature_base->name = xstrdup(feat_ptr->name);
+			feature_base->op_code = feat_ptr->op_code;
+			list_append(detail_ptr->feature_list, feature_base);
+			while ((feat_ptr->paren > 0) &&
+			       ((feat_ptr = (job_feature_t *)
+					    list_next(feat_iter)))) {
+				feature_base = xmalloc(sizeof(job_feature_t));
+				feature_base->name = xstrdup(feat_ptr->name);
+				feature_base->op_code = feat_ptr->op_code;
+				list_append(detail_ptr->feature_list,
+					    feature_base);
+			}
+			feature_base->op_code = FEATURE_OP_END;
+
 			if ((job_req_node_filter(job_ptr, *avail_bitmap, true)
 			     == SLURM_SUCCESS) &&
 			    (bit_set_count(*avail_bitmap) >= min_nodes)) {
@@ -440,6 +451,7 @@ static int  _try_sched(struct job_record *job_ptr, bitstr_t **avail_bitmap,
 			}
 			FREE_NULL_BITMAP(*avail_bitmap);
 			*avail_bitmap = bit_copy(tmp_bitmap);
+			list_destroy(detail_ptr->feature_list);
 		}
 		list_iterator_destroy(feat_iter);
 		FREE_NULL_BITMAP(tmp_bitmap);
@@ -453,7 +465,6 @@ static int  _try_sched(struct job_record *job_ptr, bitstr_t **avail_bitmap,
 		}
 
 		/* Restore the original feature information */
-		list_destroy(detail_ptr->feature_list);
 		detail_ptr->feature_list = feature_cache;
 	} else if (detail_ptr->feature_list) {
 		if ((job_req_node_filter(job_ptr, *avail_bitmap, true) !=

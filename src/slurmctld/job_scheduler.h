@@ -90,6 +90,11 @@ extern bool deadline_ok(struct job_record *job_ptr, char *func);
 extern void epilog_slurmctld(struct job_record *job_ptr);
 
 /*
+ * Delete a record from a job's feature_list
+ */
+extern void feature_list_delete(void *x);
+
+/*
  * job_is_completing - Determine if jobs are in the process of completing.
  * IN/OUT  eff_cg_bitmap - optional bitmap of all relevent completing nodes,
  *                         relevenace determined by filtering via CompleteWait
