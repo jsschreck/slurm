@@ -4096,20 +4096,26 @@ static bitstr_t *_valid_features(struct job_record *job_ptr,
 					bit_or(paren_node_bitmap,
 					       job_feat_ptr->node_bitmap_active);
 				} else {
-					error("%s: Bad feature expression list",
-					      __func__);
+					error("%s: Bad feature expression for job %u: %s",
+					      __func__, job_ptr->job_id,
+					      details_ptr->features);
 					break;
 				}
 				paren_op = job_feat_ptr->op_code;
-				if (job_feat_ptr->paren < last_paren)
+				if (job_feat_ptr->paren < last_paren) {
+					last_paren = job_feat_ptr->paren;
 					break;
+				}
 			}
-			last_paren = job_feat_ptr->paren;
 			working_node_bitmap = paren_node_bitmap;
 		} else {
 			working_node_bitmap = job_feat_ptr->node_bitmap_avail;
 		}
 
+		if (!job_feat_ptr) {
+			error("%s: Bad feature expression for job %u: %s",
+			      __func__, job_ptr->job_id, details_ptr->features);
+		}
 		if ((job_feat_ptr->op_code == FEATURE_OP_XAND) ||
 		    (job_feat_ptr->op_code == FEATURE_OP_XOR)  ||
 		    ((job_feat_ptr->op_code == FEATURE_OP_END)  &&
