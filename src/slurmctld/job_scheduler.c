@@ -4293,6 +4293,7 @@ static void *_wait_boot(void *arg)
 	time_t start_time = time(NULL);
 	int i, total_node_cnt, wait_node_cnt;
 	uint32_t save_job_id = job_ptr->job_id;
+	bool job_timeout = false;
 
 	do {
 		sleep(5);
@@ -4333,26 +4334,14 @@ static void *_wait_boot(void *arg)
 			error("Job %u timeout waiting for node %d of %d boots",
 			      job_ptr->job_id, wait_node_cnt, total_node_cnt);
 			wait_node_cnt = 0;
+			job_timeout = true;
 		}
 		unlock_slurmctld(job_write_lock);
 	} while (wait_node_cnt);
 
-	/* Validate the nodes have desired features */
 	lock_slurmctld(node_write_lock);
-#if 0
-	boot_node_bitmap = node_features_reboot(job_ptr);
-	if (boot_node_bitmap && bit_set_count(boot_node_bitmap)) {
-		char *node_list = bitmap2node_name(boot_node_bitmap);
-		error("Failed to reboot nodes %s into expected state for job %u",
-		      node_list, job_ptr->job_id);
-		(void) drain_nodes(node_list, "Node mode change failure",
-				   getuid());
-		xfree(node_list);
+	if (job_timeout)
 		(void) job_requeue(getuid(), job_ptr->job_id, NULL, false, 0);
-	}
-	FREE_NULL_BITMAP(boot_node_bitmap);
-#endif
-
 	prolog_running_decr(job_ptr);
 	job_validate_mem(job_ptr);
 	unlock_slurmctld(node_write_lock);
