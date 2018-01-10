@@ -1380,17 +1380,18 @@ static void _add_config_feature_inx(List feature_list, char *feature,
 	}
 }
 
-/* _list_delete_feature - delete an entry from the feature list,
- *	see list.h for documentation */
+/*
+ * _list_delete_feature - delete an entry from the active/available feature list
+ */
 static void _list_delete_feature(void *feature_entry)
 {
 	node_feature_t *feature_ptr = (node_feature_t *) feature_entry;
 
 	xassert(feature_ptr);
 	xassert(feature_ptr->magic == FEATURE_MAGIC);
-	xfree (feature_ptr->name);
-	FREE_NULL_BITMAP (feature_ptr->node_bitmap);
-	xfree (feature_ptr);
+	xfree(feature_ptr->name);
+	FREE_NULL_BITMAP(feature_ptr->node_bitmap);
+	xfree(feature_ptr);
 }
 
 /*
