@@ -2989,7 +2989,8 @@ extern void launch_prolog(struct job_record *job_ptr)
 	prolog_msg_ptr->work_dir = xstrdup(job_ptr->details->work_dir);
 	prolog_msg_ptr->x11 = job_ptr->details->x11;
 	if (prolog_msg_ptr->x11) {
-		prolog_msg_ptr->x11_magic_cookie = xstrdup(job_ptr->details->x11_magic_cookie);
+		prolog_msg_ptr->x11_magic_cookie =
+				xstrdup(job_ptr->details->x11_magic_cookie);
 		prolog_msg_ptr->x11_target_host = xstrdup(job_ptr->alloc_node);
 		prolog_msg_ptr->x11_target_port = job_ptr->details->x11_target_port;
 	}
@@ -3206,7 +3207,7 @@ static bool _valid_feature_counts(struct job_record *job_ptr,
 	int last_op = FEATURE_OP_AND, last_paren_op = FEATURE_OP_AND;
 	int last_paren_cnt = 0;
 	bitstr_t *feature_bitmap, *paren_bitmap = NULL, *work_bitmap;
-	bool rc = true, user_update;
+	bool have_count = false, rc = true, user_update;
 
 	xassert(detail_ptr);
 	xassert(node_bitmap);
@@ -3246,12 +3247,8 @@ static bool _valid_feature_counts(struct job_record *job_ptr,
 			if (last_op == FEATURE_OP_AND)
 				bit_clear_all(work_bitmap);
 		}
-		if (job_feat_ptr->count) {
-			if (bit_set_count(work_bitmap) < job_feat_ptr->count) {
-				rc = false;
-				break;
-			}
-		}
+		if (job_feat_ptr->count)
+			have_count = true;
 
 		if (last_paren_cnt > job_feat_ptr->paren) {
 			/* End of expression in parenthesis */
@@ -3271,7 +3268,7 @@ static bool _valid_feature_counts(struct job_record *job_ptr,
 		last_paren_cnt = job_feat_ptr->paren;
 	}
 	list_iterator_destroy(job_feat_iter);
-	if (rc)
+	if (!have_count)
 		bit_and(node_bitmap, work_bitmap);
 	FREE_NULL_BITMAP(feature_bitmap);
 	FREE_NULL_BITMAP(paren_bitmap);
@@ -3279,7 +3276,7 @@ static bool _valid_feature_counts(struct job_record *job_ptr,
 {
 	char tmp[32];
 	bit_fmt(tmp, sizeof(tmp), node_bitmap);
-	info("%s: NODE_BITMAP:%s", __func__, tmp);
+	info("%s: RC:%d NODE_BITMAP:%s", __func__, rc, tmp);
 }
 #endif
 	return rc;
